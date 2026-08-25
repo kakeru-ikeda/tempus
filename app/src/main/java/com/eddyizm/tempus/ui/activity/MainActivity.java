@@ -259,6 +259,20 @@ public class MainActivity extends BaseActivity {
     }
 
     public void initBackPressedDispatcher() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (navController == null || navController.getPreviousBackStackEntry() == null) {
+                    moveTaskToBack(true);
+                    return;
+                }
+
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+                setEnabled(true);
+            }
+        });
+
         OnBackPressedCallback callback = new OnBackPressedCallback(bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_EXPANDED) {
             @Override
             public void handleOnBackPressed() {

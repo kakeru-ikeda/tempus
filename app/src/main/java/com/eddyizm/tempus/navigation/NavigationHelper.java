@@ -2,6 +2,7 @@ package com.eddyizm.tempus.navigation;
 
 import android.content.res.Configuration;
 import android.os.Build;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
 import android.widget.FrameLayout;
@@ -17,8 +18,8 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.media3.common.util.UnstableApi;
 import androidx.navigation.NavController;
 import androidx.navigation.NavDestination;
+import androidx.navigation.NavOptions;
 import androidx.navigation.fragment.NavHostFragment;
-import androidx.navigation.ui.NavigationUI;
 
 import com.eddyizm.tempus.R;
 import com.eddyizm.tempus.util.Preferences;
@@ -69,10 +70,47 @@ public class NavigationHelper {
                     if (isTarget && currentState == BottomSheetBehavior.STATE_EXPANDED) {
                         bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
                     }
+
+                    int destinationId = destination.getId();
+                    MenuItem bottomNavigationItem = bottomNavigationView.getMenu().findItem(destinationId);
+                    if (bottomNavigationItem != null) {
+                        bottomNavigationItem.setChecked(true);
+                    }
+                    MenuItem navigationItem = navigationView.getMenu().findItem(destinationId);
+                    if (navigationItem != null) {
+                        navigationView.setCheckedItem(destinationId);
+                    }
                 });
 
-        NavigationUI.setupWithNavController(bottomNavigationView, navController);
-        NavigationUI.setupWithNavController(navigationView, navController);
+        bottomNavigationView.setOnItemSelectedListener(
+                item -> navigateToMenuDestination(navController, item));
+        navigationView.setNavigationItemSelectedListener(item -> {
+            boolean navigated = navigateToMenuDestination(navController, item);
+            if (navigated) {
+                drawerLayout.closeDrawers();
+            }
+            return navigated;
+        });
+    }
+
+    private boolean navigateToMenuDestination(@NonNull NavController navController,
+                                              @NonNull MenuItem item) {
+        NavDestination currentDestination = navController.getCurrentDestination();
+        if (currentDestination != null && currentDestination.getId() == item.getItemId()) {
+            return true;
+        }
+
+        NavOptions navOptions = new NavOptions.Builder()
+                .setPopUpTo(R.id.homeFragment, false, true)
+                .setLaunchSingleTop(true)
+                .setRestoreState(true)
+                .build();
+        try {
+            navController.navigate(item.getItemId(), null, navOptions);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 
     @Contract(pure = true)

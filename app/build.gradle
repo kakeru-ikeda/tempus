@@ -58,7 +58,9 @@ android {
 
         degoogled {
             dimension = "default"
-            applicationId = "com.eddyizm.degoogled.tempus"
+            // AK ROM (SP2000T) の PackageInstaller が package 名を 40 件のホワイトリストで
+            // 強制しているため、その空き枠を借用する。詳細は docs/sp2000t-install.md
+            applicationId = "com.foobar2000.foobar2000"
         }
     }
 
