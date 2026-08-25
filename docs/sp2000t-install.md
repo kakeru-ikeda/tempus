@@ -104,10 +104,49 @@ adb install -r tempus-renamed.apk
 ContentProvider の authority や独自パーミッション名には旧 applicationId の文字列が残るが、
 authority は package 属性と独立なので競合しない。
 
-ソースからビルドする場合は `productFlavors` の `applicationId` を上書きすればよく、
-apktool は不要。`compileSdk/targetSdk 37`・`buildToolsVersion 36.1.0`・JDK 21 が要る。
+**このフォークでは `degoogled` フレーバーの `applicationId` を
+`com.foobar2000.foobar2000` に変更済み**なので、ソースからビルドする場合は apktool も
+改名も不要。`./gradlew assembleDegoogledRelease` の出力をそのまま署名すればよい。
+`compileSdk/targetSdk 37`・`buildToolsVersion 36.1.0`・JDK 21 が要る。
 ffmpeg デコーダは `libs/lib-decoder-ffmpeg-release.aar` としてリポジトリ同梱なので
 NDK ビルドは不要。
+
+> **debug ビルドはこの端末に入らない。**
+> `buildTypes.debug` に `applicationIdSuffix = ".debug"` があるため package 名が
+> `com.foobar2000.foobar2000.debug` になり、ホワイトリストから外れて
+> `INSTALL_FAILED_INVALID_APK` になる。SP2000T 向けは常に
+> `./gradlew assembleDegoogledRelease` を使うこと。release は `minifyEnabled` の
+> R8 が通るので、debug でしか再現しない問題を追う場合は一時的に suffix を外して
+> ビルドするしかない。
+
+### 署名
+
+release ビルドはリポジトリに signingConfig が無いので `-unsigned.apk` が出る。
+端末に入っている既存インストールへ `adb install -r` で上書きするには、
+**同じ鍵で署名しないと署名不一致で弾かれる**。弾かれるとアンインストールが必要になり、
+下の「アンインストールで失われるもの」がすべて発生する。
+
+現行の `com.foobar2000.foobar2000` は `CN=AKScrobble, O=AKScrobble, C=JP`
+（SHA-256 `755601f4…eeeed6`）で署名されている。鍵とパスフレーズは別リポジトリの
+`sp2000t-scrobble/tools/env.sh` が `KEYSTORE` / `KS_PASS` / `KS_ALIAS` として持つ。
+
+```bash
+zipalign -p -f 4 app/build/outputs/apk/degoogled/release/app-degoogled-release-unsigned.apk aligned.apk
+apksigner sign --ks "$KEYSTORE" --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" \
+  --ks-key-alias "$KS_ALIAS" --v1-signing-enabled true --v2-signing-enabled true \
+  --out tempus-sp2000t.apk aligned.apk
+apksigner verify --print-certs tempus-sp2000t.apk   # 既存と SHA-256 が一致するか確認
+adb install -r tempus-sp2000t.apk
+```
+
+### ビルド環境
+
+`local.properties` の `sdk.dir` が要る（gitignore 済み）。SDK パッケージ名は
+マイナー版付きになっているので `platforms;android-37` では見つからない。
+
+```bash
+sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-37.0" "build-tools;36.1.0"
+```
 
 ### 別経路 — Open APP Service
 
