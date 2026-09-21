@@ -37,6 +37,26 @@ Astell&Kern A&ultima SP2000T (AK ROM / Android 9) に合わせて改変してい
   `NavigationUI.setupWithNavController()` を自前リスナーに置換し、
   トップレベルでのバックキーを `moveTaskToBack` にした
   (`navigation/NavigationHelper.java`, `ui/activity/MainActivity.java`)
+- ディレクトリ保存 — 設定 `download_directory_preserve_path`（既定 off）で
+  `Child.path` のフォルダー構成のままサブフォルダーに保存し、読み戻し・削除も対応
+  (`util/ExternalDownloadPath.java`, `util/ExternalAudioWriter.java`, `util/ExternalAudioReader.java`)
+- ディレクトリ保存の大量ダウンロード対策 — キューに仕事がある間だけフォアグラウンドサービス
+  (`dataSync`) と WakeLock / WifiLock で保護し、SAF の一覧取得をバッチ中キャッシュ、
+  読み戻しキャッシュは差分更新、通知と再描画イベントを間引く。1 曲の例外でキューを止めない。
+  キューはメモリ上のみでプロセス再起動後の再開は無し
+  (`service/ExternalDownloadService.java`, `service/DownloadProgressState.java`,
+  `util/ExternalAudioWriter.java`, `util/ExternalAudioReader.java`, `util/ExternalDownloadMetadataStore.java`)
+- プレイリストのダウンロードで二重登録しない（ワンショット observe）
+  (`ui/fragment/PlaylistPageFragment.java`)
+- ディレクトリ保存でプレイリストをダウンロードすると、選択フォルダー直下に
+  `<プレイリスト名>.m3u8` を書き出す。外部ストレージのツリーなら `/storage/<ボリューム>/…` の
+  絶対パス、それ以外はツリー内の相対パス。保存できなかった曲は載せない
+  (`util/M3uPlaylist.java`, `util/ExternalAudioWriter.java`)
+- ディレクトリ保存の HTTP 取得 — 曲ごとに `Connection: close` で新しい接続を張り、無通信 20 秒か
+  直近 15 秒の平均が 64 KB/s 未満（開始 10 秒後から判定）なら watchdog が切断して `Range` で途中から再開。
+  1 曲あたり最大 6 回、1/2/5/10/20 秒のバックオフ。206 の `Content-Range` が合わなければ先頭からやり直す。
+  バッファは 64 KB
+  (`util/ExternalAudioWriter.java`, `util/HttpResumePolicy.java`)
 
 ## この端末で作業するときの注意
 

@@ -1,6 +1,7 @@
 package com.eddyizm.tempus.util;
 
 import android.net.Uri;
+import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 
@@ -15,6 +16,7 @@ import com.eddyizm.tempus.subsonic.models.PodcastEpisode;
 import java.text.Normalizer;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +30,15 @@ public class ExternalAudioReader {
     private static final Object LOCK = new Object();
     private static final ExecutorService REFRESH_EXECUTOR = Executors.newSingleThreadExecutor();
     private static final MutableLiveData<Long> refreshEvents = new MutableLiveData<>();
+    // Files stored while a rebuild is running; merged into its result so they are not lost.
+    private static final Map<String, DocumentFile> storedDuringRefresh = new HashMap<>();
+
+    // Per-file events are coalesced: every event rebinds whole song lists on the main thread.
+    private static final long STORED_EVENT_THROTTLE_MS = 1000;
+    private static final Object EVENT_LOCK = new Object();
+    private static Handler mainHandler;
+    private static long lastStoredEventMs = 0;
+    private static boolean storedEventScheduled = false;
 
     private static volatile String cachedDirUri;
     private static volatile boolean refreshInProgress = false;
@@ -97,6 +108,55 @@ public class ExternalAudioReader {
         requestRefresh();
     }
 
+    /**
+     * Records a file just written (or found already present) by {@link ExternalAudioWriter}
+     * without rescanning the folder. When no cache for the current folder exists yet the pending
+     * rebuild picks the file up from {@link ExternalDownloadMetadataStore}.
+     */
+    public static void onFileStored(String key, Uri uri) {
+        if (key == null || uri == null) return;
+        String uriString = Preferences.getDownloadDirectoryUri();
+        DocumentFile file = DocumentFile.fromSingleUri(App.getContext(), uri);
+        if (file == null) return;
+        synchronized (LOCK) {
+            if (refreshInProgress) {
+                storedDuringRefresh.put(key, file);
+            }
+            if (uriString != null && uriString.equals(cachedDirUri)) {
+                cache.put(key, file);
+            }
+        }
+        postStoredEvent();
+    }
+
+    private static void postStoredEvent() {
+        synchronized (EVENT_LOCK) {
+            long now = SystemClock.elapsedRealtime();
+            long wait = lastStoredEventMs + STORED_EVENT_THROTTLE_MS - now;
+            if (wait <= 0) {
+                lastStoredEventMs = now;
+                refreshEvents.postValue(now);
+                return;
+            }
+            if (storedEventScheduled) return;
+            storedEventScheduled = true;
+            if (mainHandler == null) mainHandler = new Handler(Looper.getMainLooper());
+            mainHandler.postDelayed(() -> {
+                synchronized (EVENT_LOCK) {
+                    storedEventScheduled = false;
+                    lastStoredEventMs = SystemClock.elapsedRealtime();
+                }
+                refreshEvents.setValue(SystemClock.elapsedRealtime());
+            }, wait);
+        }
+    }
+
+    /** Playlists written next to the songs are not downloads. */
+    private static boolean isPlaylistFile(String name) {
+        String lower = name.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".m3u8") || lower.endsWith(".m3u");
+    }
+
     public static LiveData<Long> getRefreshEvents() {
         return refreshEvents;
     }
@@ -105,6 +165,22 @@ public class ExternalAudioReader {
         String name = artist != null && !artist.isEmpty() ? artist + " - " + title : title;
         if (album != null && !album.isEmpty()) name += " (" + album + ")";
         return normalizeForComparison(name);
+    }
+
+    /**
+     * Key for a file saved under the server path (see {@link ExternalDownloadPath}): normalized
+     * segments joined with '/', extension dropped. Null when the path is blank. Flat keys never
+     * contain '/', so the two kinds cannot collide except for a single-segment path.
+     */
+    public static String buildPathKey(String path) {
+        List<String> segments = ExternalDownloadPath.lookupSegments(path);
+        if (segments.isEmpty()) return null;
+        StringBuilder key = new StringBuilder();
+        for (String segment : segments) {
+            if (key.length() > 0) key.append('/');
+            key.append(normalizeForComparison(segment));
+        }
+        return key.toString();
     }
 
     private static Uri findUri(String artist, String title, String album) {
@@ -116,6 +192,13 @@ public class ExternalAudioReader {
     }
 
     public static Uri getUri(Child media) {
+        String pathKey = buildPathKey(media.getPath());
+        if (pathKey != null) {
+            ensureCache();
+            if (cachedDirUri == null) return null;
+            DocumentFile file = cache.get(pathKey);
+            if (file != null && file.exists()) return file.getUri();
+        }
         return findUri(media.getArtist(), media.getTitle(), media.getAlbum());
     }
 
@@ -131,14 +214,24 @@ public class ExternalAudioReader {
         String key = buildKey(media.getArtist(), media.getTitle(), media.getAlbum());
         cache.remove(key);
         ExternalDownloadMetadataStore.remove(key);
+
+        String pathKey = buildPathKey(media.getPath());
+        if (pathKey != null) {
+            cache.remove(pathKey);
+            ExternalDownloadMetadataStore.remove(pathKey);
+        }
     }
 
     public static boolean delete(Child media) {
         ensureCache();
         if (cachedDirUri == null) return false;
 
-        String key = buildKey(media.getArtist(), media.getTitle(), media.getAlbum());
-        DocumentFile file = cache.get(key);
+        String key = buildPathKey(media.getPath());
+        DocumentFile file = key != null ? cache.get(key) : null;
+        if (file == null || !file.exists()) {
+            key = buildKey(media.getArtist(), media.getTitle(), media.getAlbum());
+            file = cache.get(key);
+        }
         boolean deleted = false;
         if (file != null && file.exists()) {
             deleted = file.delete();
@@ -188,11 +281,31 @@ public class ExternalAudioReader {
         Set<String> verifiedKeys = new HashSet<>();
         Map<String, DocumentFile> newEntries = new HashMap<>();
 
+        // Folders that lead to a file saved under its server path; only these are descended into
+        // so a large library in the same tree is not scanned.
+        Set<String> pathPrefixes = new HashSet<>();
+        for (String key : expectedSizes.keySet()) {
+            int slash = key.indexOf('/');
+            while (slash > 0) {
+                pathPrefixes.add(key.substring(0, slash));
+                slash = key.indexOf('/', slash + 1);
+            }
+        }
+
         if (directory != null && directory.canRead()) {
             for (DocumentFile file : directory.listFiles()) {
-                if (file == null || file.isDirectory()) continue;
+                if (file == null) continue;
                 String existing = file.getName();
                 if (existing == null) continue;
+
+                if (file.isDirectory()) {
+                    String prefix = normalizeForComparison(existing);
+                    if (pathPrefixes.contains(prefix)) {
+                        scanPathDirectory(file, prefix, pathPrefixes, expectedSizes, verifiedKeys, newEntries);
+                    }
+                    continue;
+                }
+                if (isPlaylistFile(existing)) continue;
 
                 String base = existing.replaceFirst("\\.[^\\.]+$", "");
                 String key = normalizeForComparison(base);
@@ -223,7 +336,38 @@ public class ExternalAudioReader {
         synchronized (LOCK) {
             cache.clear();
             cache.putAll(newEntries);
+            cache.putAll(storedDuringRefresh);
+            storedDuringRefresh.clear();
             cachedDirUri = uriString;
+        }
+    }
+
+    private static void scanPathDirectory(DocumentFile directory,
+                                          String prefix,
+                                          Set<String> pathPrefixes,
+                                          Map<String, Long> expectedSizes,
+                                          Set<String> verifiedKeys,
+                                          Map<String, DocumentFile> newEntries) {
+        for (DocumentFile file : directory.listFiles()) {
+            if (file == null) continue;
+            String existing = file.getName();
+            if (existing == null) continue;
+
+            if (file.isDirectory()) {
+                String childPrefix = prefix + "/" + normalizeForComparison(existing);
+                if (pathPrefixes.contains(childPrefix)) {
+                    scanPathDirectory(file, childPrefix, pathPrefixes, expectedSizes, verifiedKeys, newEntries);
+                }
+                continue;
+            }
+            if (isPlaylistFile(existing)) continue;
+
+            String key = prefix + "/" + normalizeForComparison(ExternalDownloadPath.stripExtension(existing));
+            Long expected = expectedSizes.get(key);
+            if (expected != null && expected > 0 && file.length() == expected) {
+                newEntries.put(key, file);
+                verifiedKeys.add(key);
+            }
         }
     }
 

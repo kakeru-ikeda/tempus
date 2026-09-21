@@ -22,6 +22,8 @@ import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaBrowser;
@@ -180,8 +182,15 @@ public class PlaylistPageFragment extends Fragment implements ClickCallback {
         if (item.getItemId() == R.id.action_download_playlist) {
             String _playListID = playlistPageViewModel.getPlaylist().getId();
             String _playListName = playlistPageViewModel.getPlaylist().getName();
-            playlistPageViewModel.getPlaylistSongLiveList().observe(getViewLifecycleOwner(), songs -> {
-                if (isVisible() && getActivity() != null) {
+            // One-shot: a lingering observer would re-enqueue the whole playlist every time the
+            // song list is emitted again (e.g. after a playlist update).
+            LiveData<List<Child>> songsLiveData = playlistPageViewModel.getPlaylistSongLiveList();
+            songsLiveData.observe(getViewLifecycleOwner(), new Observer<List<Child>>() {
+                @Override
+                public void onChanged(List<Child> songs) {
+                    if (songs == null) return;
+                    songsLiveData.removeObserver(this);
+                    if (!isAdded() || getActivity() == null) return;
                     if (Preferences.getDownloadDirectoryUri() == null) {
                         DownloadUtil.getDownloadTracker(requireContext()).download(
                             MappingUtil.mapDownloads(songs),
@@ -193,7 +202,7 @@ public class PlaylistPageFragment extends Fragment implements ClickCallback {
                             }).collect(Collectors.toList())
                         );
                     } else {
-                        songs.forEach(child -> ExternalAudioWriter.downloadToUserDirectory(requireContext(), child, _playListID, _playListName));
+                        ExternalAudioWriter.downloadPlaylistToUserDirectory(requireContext(), songs, _playListID, _playListName);
                     }
                 }
             });
