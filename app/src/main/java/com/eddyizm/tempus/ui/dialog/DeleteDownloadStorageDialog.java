@@ -77,7 +77,18 @@ public class DeleteDownloadStorageDialog extends DialogFragment {
                                 String fileUri = file.getUri().toString();
                                 if (trackedFilesMap.containsKey(fileUri)) {
                                     file.delete();
-                                    new DownloadRepository().delete(trackedFilesMap.get(fileUri).getId());
+                                    new DownloadRepository().delete(trackedFilesMap.remove(fileUri).getId());
+                                }
+                            }
+
+                            // Files saved under the server path live in subfolders of the tree.
+                            String treeDocumentPrefix = uriString + "/document/";
+                            for (Map.Entry<String, Download> entry : trackedFilesMap.entrySet()) {
+                                if (!entry.getKey().startsWith(treeDocumentPrefix)) continue;
+                                DocumentFile file = DocumentFile.fromSingleUri(context, Uri.parse(entry.getKey()));
+                                if (file != null && file.exists()) {
+                                    file.delete();
+                                    new DownloadRepository().delete(entry.getValue().getId());
                                 }
                             }
                         }

@@ -430,6 +430,9 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
                 directory.setVisible(false);
             }
         }
+
+        Preference preservePath = findPreference("download_directory_preserve_path");
+        if (preservePath != null) preservePath.setVisible(directory.isVisible());
     }
 
     private void setNetorkPingTimeoutBase() {

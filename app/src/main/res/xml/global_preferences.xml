@@ -389,6 +389,14 @@
             android:order="104"
             app:isPreferenceVisible="false" />
 
+        <SwitchPreference
+            android:key="download_directory_preserve_path"
+            android:title="@string/settings_download_directory_preserve_path_title"
+            android:summary="@string/settings_download_directory_preserve_path_summary"
+            android:defaultValue="false"
+            android:order="105"
+            app:isPreferenceVisible="false" />
+
         <Preference
             android:key="delete_download_storage"
             app:title="@string/settings_delete_download_storage_title"

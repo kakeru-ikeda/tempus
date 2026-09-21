@@ -437,6 +437,8 @@
     <string name="settings_delete_download_storage_summary">続行すると、保存済みアイテムがすべて完全に削除されます。</string>
     <string name="settings_delete_download_storage_title">保存済みアイテムの削除</string>
     <string name="settings_download_storage_title">ダウンロードの保存先</string>
+    <string name="settings_download_directory_preserve_path_summary">サーバー上のパスに沿ってサブフォルダーに保存します（例: Artist/Album/01 Title.flac）</string>
+    <string name="settings_download_directory_preserve_path_title">サーバーのフォルダー構成を維持</string>
     <string name="settings_download_folder_cleared">ダウンロードフォルダーをクリアしました。</string>
     <string name="settings_download_folder_set">ダウンロードフォルダーを設定しました</string>
     <string name="settings_set_download_folder">ダウンロードフォルダーを設定</string>

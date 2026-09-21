@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="aa_albums">Albums</string>
     <string name="aa_album_most_played">Albums most played</string>
     <string name="aa_album_recently_added">Albums added</string>
@@ -452,6 +452,8 @@
     <string name="settings_delete_download_storage_summary">Proceeding will result in the irreversible deletion of all saved items.</string>
     <string name="settings_delete_download_storage_title">Delete saved items</string>
     <string name="settings_download_storage_title">Download storage</string>
+    <string name="settings_download_directory_preserve_path_summary" tools:ignore="MissingTranslation">Save files into subfolders using the server path (e.g. Artist/Album/01 Title.flac)</string>
+    <string name="settings_download_directory_preserve_path_title" tools:ignore="MissingTranslation">Keep server folder structure</string>
     <string name="settings_download_folder_cleared">Download folder cleared.</string>
     <string name="settings_download_folder_set">Download folder set</string>
     <string name="settings_set_download_folder">Set download folder</string>
