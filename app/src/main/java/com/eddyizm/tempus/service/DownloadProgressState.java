@@ -3,6 +3,8 @@ package com.eddyizm.tempus.service;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 
 import androidx.annotation.GuardedBy;
@@ -42,6 +44,14 @@ public final class DownloadProgressState {
     @GuardedBy("lock") private long lastSampleMs = 0;
     @GuardedBy("lock") private float currentSpeedBytesPerSec = 0f;
 
+    // Coalesces notification updates: posting one per enqueued track (hundreds at once for a
+    // playlist) gets rate-limited by the system and leaves a stale count behind.
+    private static final long NOTIFICATION_THROTTLE_MS = 500;
+    @GuardedBy("lock") private long lastNotificationPostMs = 0;
+    @GuardedBy("lock") private boolean notificationPostScheduled = false;
+    @GuardedBy("lock") private int batchGeneration = 0;
+    private Handler mainHandler;
+
     private volatile String currentTrackTitle = null;
 
     private DownloadProgressState() {}
@@ -67,7 +77,7 @@ public final class DownloadProgressState {
             if (batchStartTimeMs == 0) {
                 batchStartTimeMs = SystemClock.elapsedRealtime();
             }
-            postProgressNotification(context.getApplicationContext());
+            requestProgressNotification(context.getApplicationContext());
         }
     }
 
@@ -123,7 +133,7 @@ public final class DownloadProgressState {
             }
             lastBytesTotal = bytesDownloadedSoFar;
             lastSampleMs = now;
-            postProgressNotification(context.getApplicationContext());
+            requestProgressNotification(context.getApplicationContext());
         }
     }
 
@@ -134,12 +144,57 @@ public final class DownloadProgressState {
             postFinalNotification(context);
             reset();
         } else {
-            postProgressNotification(context);
+            requestProgressNotification(context);
+        }
+    }
+
+    /** Whether an external download batch is still being tracked. */
+    public boolean isBatchActive() {
+        synchronized (lock) {
+            return enqueuedCount > 0;
+        }
+    }
+
+    /** Current progress notification, used as the foreground notification of the download service. */
+    public Notification buildProgressNotification(Context context) {
+        synchronized (lock) {
+            return buildProgressNotificationLocked(context.getApplicationContext());
         }
     }
 
     @GuardedBy("lock")
+    private void requestProgressNotification(Context context) {
+        long now = SystemClock.elapsedRealtime();
+        long wait = lastNotificationPostMs + NOTIFICATION_THROTTLE_MS - now;
+        if (wait <= 0) {
+            postProgressNotification(context);
+            return;
+        }
+        if (notificationPostScheduled) return;
+        notificationPostScheduled = true;
+        final int generation = batchGeneration;
+        if (mainHandler == null) mainHandler = new Handler(Looper.getMainLooper());
+        mainHandler.postDelayed(() -> {
+            synchronized (lock) {
+                if (generation != batchGeneration) return;
+                notificationPostScheduled = false;
+                // The batch may have finished meanwhile; its final notification already went out.
+                if (enqueuedCount > 0) {
+                    postProgressNotification(context);
+                }
+            }
+        }, wait);
+    }
+
+    @GuardedBy("lock")
     private void postProgressNotification(Context context) {
+        lastNotificationPostMs = SystemClock.elapsedRealtime();
+        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        nm.notify(EXTERNAL_PROGRESS_NOTIFICATION_ID, buildProgressNotificationLocked(context));
+    }
+
+    @GuardedBy("lock")
+    private Notification buildProgressNotificationLocked(Context context) {
         int doneCount = completedCount + failedCount + skippedCount;
         int total = enqueuedCount;
         int inFlight = total - doneCount;
@@ -158,7 +213,7 @@ public final class DownloadProgressState {
             contentText = context.getString(R.string.notification_processing);
         }
 
-        Notification notification = new NotificationCompat.Builder(context, DownloadUtil.DOWNLOAD_NOTIFICATION_CHANNEL_ID)
+        return new NotificationCompat.Builder(context, DownloadUtil.DOWNLOAD_NOTIFICATION_CHANNEL_ID)
                 .setContentTitle(contentTitle)
                 .setContentText(contentText)
                 .setSmallIcon(R.drawable.ic_download)
@@ -168,9 +223,6 @@ public final class DownloadProgressState {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOnlyAlertOnce(true)
                 .build();
-
-        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        nm.notify(EXTERNAL_PROGRESS_NOTIFICATION_ID, notification);
     }
 
     @GuardedBy("lock")
@@ -227,6 +279,10 @@ public final class DownloadProgressState {
         lastSampleMs = SystemClock.elapsedRealtime();
         currentSpeedBytesPerSec = 0f;
         currentTrackTitle = null;
+        // Drops any throttled progress post still pending for the finished batch.
+        batchGeneration++;
+        notificationPostScheduled = false;
+        lastNotificationPostMs = 0;
     }
 
     private static String formatSpeed(float bytesPerSec) {
