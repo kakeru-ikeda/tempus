@@ -137,6 +137,40 @@ public class ExternalAudioWriter {
         submit(appContext, () -> writePlaylistFile(appContext, snapshot, relativePaths, playlistName));
     }
 
+    /**
+     * Enqueues only missing playlist songs, then writes the full current playlist's m3u8.
+     * The caller must run off the main thread after the reader cache is ready
+     * (PlaylistSyncManager awaits it).
+     */
+    public static void syncPlaylistToUserDirectory(Context context, List<Child> songs, String playlistId, String playlistName) {
+        if (context == null || songs == null || songs.isEmpty()) return;
+        String uriString = Preferences.getDownloadDirectoryUri();
+        if (uriString == null) return;
+        Uri treeUri = Uri.parse(uriString);
+        Context appContext = context.getApplicationContext();
+        List<Child> snapshot = new ArrayList<>(songs);
+        String[] relativePaths = new String[snapshot.size()];
+        for (int i = 0; i < snapshot.size(); i++) {
+            Child child = snapshot.get(i);
+            if (child == null) continue;
+            Uri existing = ExternalAudioReader.getUri(child);
+            if (existing != null) {
+                try {
+                    relativePaths[i] = M3uPlaylist.relativeDocumentPath(
+                            DocumentsContract.getTreeDocumentId(treeUri),
+                            DocumentsContract.getDocumentId(existing));
+                } catch (IllegalArgumentException e) {
+                    relativePaths[i] = null;
+                }
+                if (relativePaths[i] != null) continue;
+            }
+            final int index = i;
+            enqueueSong(appContext, child, playlistId, playlistName, path -> relativePaths[index] = path);
+        }
+        // submit also drains/stops the service when there are no song tasks.
+        submit(appContext, () -> writePlaylistFile(appContext, snapshot, relativePaths, playlistName));
+    }
+
     private static void enqueueSong(Context appContext, Child child, String playlistId, String playlistName, Consumer<String> onRelativePath) {
         // Register with the progress tracker BEFORE submitting to the executor so the
         // total count is accurate even when many tracks are enqueued in rapid succession.

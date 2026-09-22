@@ -179,7 +179,7 @@ public final class PlaylistSyncManager {
                 dao.updateSyncState(id, row.getName(), row.getSongIdsHash(), now);
                 return;
             }
-            ExternalAudioWriter.downloadPlaylistToUserDirectory(appContext, songs, id, currentName);
+            ExternalAudioWriter.syncPlaylistToUserDirectory(appContext, songs, id, currentName);
             dao.updateSyncState(id, currentName, currentHash, now);
             Log.i(TAG, "Synchronizing playlist " + id + ": songs=" + songs.size()
                     + ", missing=" + missing

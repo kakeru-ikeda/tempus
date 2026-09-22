@@ -16,6 +16,43 @@ public class M3uPlaylistTest {
     private static final String EXT = M3uPlaylist.EXTERNAL_STORAGE_AUTHORITY;
 
     @Test
+    public void relativeDocumentPathKeepsNestedPathAndFileName() {
+        assertEquals("A/B/x.flac",
+                M3uPlaylist.relativeDocumentPath("primary:Music", "primary:Music/A/B/x.flac"));
+        assertEquals("A/曲 01.flac",
+                M3uPlaylist.relativeDocumentPath("primary:Music", "primary:Music/A/曲 01.flac"));
+        assertEquals("x.flac",
+                M3uPlaylist.relativeDocumentPath("1234-ABCD:Music", "1234-ABCD:Music/x.flac"));
+    }
+
+    @Test
+    public void relativeDocumentPathSupportsVolumeRoots() {
+        assertEquals("A/x.flac",
+                M3uPlaylist.relativeDocumentPath("primary:", "primary:A/x.flac"));
+        assertEquals("x.flac",
+                M3uPlaylist.relativeDocumentPath("1234-ABCD:", "1234-ABCD:x.flac"));
+    }
+
+    @Test
+    public void relativeDocumentPathRejectsNullAndTreeItself() {
+        assertNull(M3uPlaylist.relativeDocumentPath(null, "primary:Music/x.flac"));
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:Music", null));
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:Music", "primary:Music"));
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:", "primary:"));
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:Music", "primary:Music/"));
+    }
+
+    @Test
+    public void relativeDocumentPathRejectsOtherTreesAndInvalidIds() {
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:Music", "primary:Music2/x.flac"));
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:Music", "primary:Other/x.flac"));
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:Music", "1234-ABCD:Music/x.flac"));
+        assertNull(M3uPlaylist.relativeDocumentPath("primary:", "1234-ABCD:x.flac"));
+        assertNull(M3uPlaylist.relativeDocumentPath("Music", "Music/x.flac"));
+        assertNull(M3uPlaylist.relativeDocumentPath(":Music", ":Music/x.flac"));
+    }
+
+    @Test
     public void primaryVolumeMapsToEmulatedStorage() {
         assertEquals("/storage/emulated/0/Music",
                 M3uPlaylist.resolveTreeBasePath(EXT, "primary:Music"));

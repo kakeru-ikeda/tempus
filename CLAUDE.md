@@ -60,9 +60,10 @@ Astell&Kern A&ultima SP2000T (AK ROM / Android 9) に合わせて改変してい
 - プレイリスト自動同期 — ディレクトリ保存でダウンロードしたプレイリストを `synced_playlist`（DB v22）に登録し、
   起動時・ホーム表示時（10 分スロットル）とプレイリスト画面表示時に曲の増減を反映。不足曲を保存し m3u8 を
   書き直す。ダウンロード中は同期しない。消えた曲は m3u8 から外すだけでファイルは消さない。
+  同期では不足曲だけをキューに積み、既存曲の m3u8 パスは読み戻しキャッシュの URI から求める。
   メニュー「自動同期を解除」で登録解除。
   既存のディレクトリ保存ダウンロード（download テーブルの content:// 行の playlist_id）から初回だけ自動登録する（フラグ playlist_sync_backfilled）。
-  (`util/PlaylistSyncManager.java`, `util/PlaylistSyncPolicy.java`, `model/SyncedPlaylist.kt`,
+  (`util/PlaylistSyncManager.java`, `util/PlaylistSyncPolicy.java`, `util/M3uPlaylist.java`, `model/SyncedPlaylist.kt`,
   `util/Preferences.kt`, `database/dao/DownloadDao.java`, `database/dao/SyncedPlaylistDao.java`,
   `database/AppDatabase.java`, `ui/fragment/PlaylistPageFragment.java`,
   `ui/fragment/HomeTabMusicFragment.java`, `ui/activity/MainActivity.java`)

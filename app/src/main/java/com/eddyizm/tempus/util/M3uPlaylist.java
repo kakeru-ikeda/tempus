@@ -64,6 +64,18 @@ public final class M3uPlaylist {
         return relative.isEmpty() ? base : base + "/" + relative;
     }
 
+    /** Path inside an external-storage SAF tree, '/'-separated with no leading slash. */
+    public static String relativeDocumentPath(String treeDocumentId, String documentId) {
+        if (treeDocumentId == null || documentId == null) return null;
+        int colon = treeDocumentId.indexOf(':');
+        if (colon <= 0) return null;
+        String prefix = treeDocumentId.endsWith(":") || treeDocumentId.endsWith("/")
+                ? treeDocumentId : treeDocumentId + "/";
+        if (!documentId.startsWith(prefix)) return null;
+        String relative = documentId.substring(prefix.length());
+        return relative.isEmpty() || relative.startsWith("/") ? null : relative;
+    }
+
     /** Path line for a file at {@code relativePath} inside the tree; relative when the base is unknown. */
     public static String entryPath(String basePath, String relativePath) {
         String relative = trimSlashes(relativePath);
