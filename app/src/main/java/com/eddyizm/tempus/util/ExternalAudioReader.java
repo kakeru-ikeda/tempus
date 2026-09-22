@@ -96,6 +96,23 @@ public class ExternalAudioReader {
         }
     }
 
+    /**
+     * Blocks a background thread until the folder cache matches the selected folder, so lookups
+     * do not report every file as missing while a rebuild started elsewhere is still running.
+     * Returns false when no folder is selected or the wait times out.
+     */
+    public static boolean awaitCache(long timeoutMs) {
+        long deadline = SystemClock.elapsedRealtime() + timeoutMs;
+        while (true) {
+            ensureCache();
+            String uriString = Preferences.getDownloadDirectoryUri();
+            if (uriString == null) return false;
+            if (uriString.equals(cachedDirUri) && !refreshInProgress) return true;
+            if (SystemClock.elapsedRealtime() >= deadline) return false;
+            SystemClock.sleep(500);
+        }
+    }
+
     public static void refreshCache() {
         refreshCacheAsync();
     }

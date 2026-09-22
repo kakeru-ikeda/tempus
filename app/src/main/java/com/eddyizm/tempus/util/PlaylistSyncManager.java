@@ -36,6 +36,7 @@ import retrofit2.Response;
 @OptIn(markerClass = UnstableApi.class)
 public final class PlaylistSyncManager {
     private static final String TAG = "PlaylistSyncManager";
+    private static final long CACHE_WAIT_MS = 3L * 60L * 1000L;
     private static PlaylistSyncManager instance;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -79,6 +80,11 @@ public final class PlaylistSyncManager {
         executor.execute(() -> {
             try {
                 backfillOnce();
+                if (!awaitCache()) {
+                    // Let the next trigger retry instead of waiting out the throttle.
+                    lastRunElapsedMs = 0;
+                    return;
+                }
                 for (SyncedPlaylist row : dao.getAllSync()) {
                     syncOne(appContext, row);
                 }
@@ -98,7 +104,7 @@ public final class PlaylistSyncManager {
         executor.execute(() -> {
             try {
                 SyncedPlaylist row = dao.getOne(playlistId);
-                if (row != null) syncOne(appContext, row);
+                if (row != null && awaitCache()) syncOne(appContext, row);
             } finally {
                 running.set(false);
             }
@@ -123,6 +129,13 @@ public final class PlaylistSyncManager {
         } catch (Exception e) {
             Log.w(TAG, "Failed to backfill directory playlists", e);
         }
+    }
+
+    /** Missing-file counts are only meaningful once the folder listing is ready. */
+    private static boolean awaitCache() {
+        if (ExternalAudioReader.awaitCache(CACHE_WAIT_MS)) return true;
+        Log.i(TAG, "Skipping sync: download folder listing not ready");
+        return false;
     }
 
     private static boolean canSync() {
