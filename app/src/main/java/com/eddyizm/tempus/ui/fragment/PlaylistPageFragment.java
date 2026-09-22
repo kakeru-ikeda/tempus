@@ -48,6 +48,7 @@ import com.eddyizm.tempus.util.DownloadUtil;
 import com.eddyizm.tempus.util.MappingUtil;
 import com.eddyizm.tempus.util.MusicUtil;
 import com.eddyizm.tempus.util.ExternalAudioWriter;
+import com.eddyizm.tempus.util.PlaylistSyncManager;
 import com.eddyizm.tempus.util.Preferences;
 import com.eddyizm.tempus.viewmodel.PlaybackViewModel;
 import com.eddyizm.tempus.viewmodel.PlaylistPageViewModel;
@@ -128,6 +129,7 @@ public class PlaylistPageFragment extends Fragment implements ClickCallback {
         initMusicButton();
         initBackCover();
         initSongsView();
+        PlaylistSyncManager.getInstance().syncPlaylist(requireContext(), playlistArg.getId());
         
         playlistPageViewModel.getPlaylistMissingEvent().observe(getViewLifecycleOwner(), isMissing -> {
             if (isMissing && getContext() != null) {
@@ -203,6 +205,7 @@ public class PlaylistPageFragment extends Fragment implements ClickCallback {
                         );
                     } else {
                         ExternalAudioWriter.downloadPlaylistToUserDirectory(requireContext(), songs, _playListID, _playListName);
+                        PlaylistSyncManager.getInstance().register(_playListID, _playListName, songs);
                     }
                 }
             });
@@ -212,6 +215,10 @@ public class PlaylistPageFragment extends Fragment implements ClickCallback {
             return true;
         } else if (item.getItemId() == R.id.action_unpin_playlist) {
             playlistPageViewModel.setPinned(false);
+            return true;
+        } else if (item.getItemId() == R.id.action_unregister_playlist_sync) {
+            PlaylistSyncManager.getInstance().unregister(playlistPageViewModel.getPlaylist().getId());
+            Toast.makeText(requireContext(), R.string.playlist_sync_unregistered_toast, Toast.LENGTH_SHORT).show();
             return true;
         } else if (item.getItemId() == R.id.action_add_to_queue) {
             List<Child> songs = playlistPageViewModel.getPlaylistSongLiveList().getValue();
@@ -242,6 +249,11 @@ public class PlaylistPageFragment extends Fragment implements ClickCallback {
     }
 
     private void initMenuOption(Menu menu) {
+        PlaylistSyncManager.getInstance().isRegistered(playlistPageViewModel.getPlaylist().getId())
+                .observe(getViewLifecycleOwner(), registered -> {
+                    MenuItem item = menu.findItem(R.id.action_unregister_playlist_sync);
+                    if (item != null) item.setVisible(Boolean.TRUE.equals(registered));
+                });
         playlistPageViewModel.isPinned(getViewLifecycleOwner()).observe(getViewLifecycleOwner(), isPinned -> {
             menu.findItem(R.id.action_unpin_playlist).setVisible(isPinned);
             menu.findItem(R.id.action_pin_playlist).setVisible(!isPinned);

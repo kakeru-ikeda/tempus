@@ -286,6 +286,8 @@
     <string name="menu_sort_least_recently_starred">Least recently starred</string>
     <string name="menu_pin_button">Add to faves</string>
     <string name="menu_unpin_button">Remove from faves</string>
+    <string name="menu_playlist_sync_unregister_button" tools:ignore="MissingTranslation">Stop auto-sync</string>
+    <string name="playlist_sync_unregistered_toast" tools:ignore="MissingTranslation">Auto-sync stopped for this playlist</string>
     <string name="playlist_sort_pinned">Faves</string>
     <string name="playlist_sort_last_played">Last played</string>
     <string name="playlist_sort_last_updated">Last updated</string>

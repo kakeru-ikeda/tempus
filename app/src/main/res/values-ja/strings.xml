@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="aa_albums">アルバム</string>
     <string name="aa_album_most_played">よく再生するアルバム</string>
     <string name="aa_album_recently_added">追加されたアルバム</string>
@@ -274,6 +274,8 @@
     <string name="menu_sort_least_recently_starred">お気に入りして時間の経った項目</string>
     <string name="menu_pin_button">ホーム画面に追加</string>
     <string name="menu_unpin_button">ホーム画面から削除</string>
+    <string name="menu_playlist_sync_unregister_button">自動同期を解除</string>
+    <string name="playlist_sync_unregistered_toast">このプレイリストの自動同期を解除しました</string>
     <string name="playlist_sort_pinned">お気に入り</string>
     <string name="playlist_sort_last_played">最後に再生した日時</string>
     <string name="playlist_sort_last_updated">最終更新日時</string>
