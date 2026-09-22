@@ -60,6 +60,7 @@ import com.eddyizm.tempus.util.AssetLinkNavigator;
 import com.eddyizm.tempus.util.AssetLinkUtil;
 import com.eddyizm.tempus.util.Constants;
 import com.eddyizm.tempus.util.DownloadRepair;
+import com.eddyizm.tempus.util.PlaylistSyncManager;
 import com.eddyizm.tempus.util.Preferences;
 import com.eddyizm.tempus.viewmodel.MainViewModel;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -148,6 +149,7 @@ public class MainActivity extends BaseActivity {
 
         init();
         checkConnectionType();
+        PlaylistSyncManager.getInstance().syncAll(this, false);
         getOpenSubsonicExtensions();
         checkTempusUpdate();
 

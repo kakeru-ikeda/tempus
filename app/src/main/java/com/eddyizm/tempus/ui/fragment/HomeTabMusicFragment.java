@@ -67,6 +67,7 @@ import com.eddyizm.tempus.util.ExternalAudioWriter;
 import com.eddyizm.tempus.util.LiveDataUtils;
 import com.eddyizm.tempus.util.MappingUtil;
 import com.eddyizm.tempus.util.MusicUtil;
+import com.eddyizm.tempus.util.PlaylistSyncManager;
 import com.eddyizm.tempus.util.Preferences;
 import com.eddyizm.tempus.util.TileSizeManager;
 import com.eddyizm.tempus.util.UIUtil;
@@ -174,6 +175,7 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         refreshPlaylistView();
         if (topSongAdapter != null) setTopSongsMediaBrowserListenableFuture();
         if (starredSongAdapter != null) setStarredSongsMediaBrowserListenableFuture();
+        PlaylistSyncManager.getInstance().syncAll(requireContext(), false);
     }
 
     @Override

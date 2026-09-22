@@ -57,6 +57,13 @@ Astell&Kern A&ultima SP2000T (AK ROM / Android 9) に合わせて改変してい
   1 曲あたり最大 6 回、1/2/5/10/20 秒のバックオフ。206 の `Content-Range` が合わなければ先頭からやり直す。
   バッファは 64 KB
   (`util/ExternalAudioWriter.java`, `util/HttpResumePolicy.java`)
+- プレイリスト自動同期 — ディレクトリ保存でダウンロードしたプレイリストを `synced_playlist`（DB v22）に登録し、
+  起動時・ホーム表示時（10 分スロットル）とプレイリスト画面表示時に曲の増減を反映。不足曲を保存し m3u8 を
+  書き直す。ダウンロード中は同期しない。消えた曲は m3u8 から外すだけでファイルは消さない。
+  メニュー「自動同期を解除」で登録解除
+  (`util/PlaylistSyncManager.java`, `util/PlaylistSyncPolicy.java`, `model/SyncedPlaylist.kt`,
+  `database/dao/SyncedPlaylistDao.java`, `database/AppDatabase.java`, `ui/fragment/PlaylistPageFragment.java`,
+  `ui/fragment/HomeTabMusicFragment.java`, `ui/activity/MainActivity.java`)
 
 ## この端末で作業するときの注意
 
