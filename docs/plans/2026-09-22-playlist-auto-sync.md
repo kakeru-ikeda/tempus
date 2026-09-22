@@ -42,6 +42,11 @@
 
 lint は `app/lint-baseline.xml` でフィルタされる。ベースライン外の新規指摘が 0 件であること。
 
+**ワーカーへの注意:** ワーカーのサンドボックス内では Gradle が起動できない（`~/.gradle` が読み取り専用、
+ネットワーク無し）。Gradle を実行しようとしないこと。上の検証コマンドは runner がサンドボックス外で
+自動実行する。コードを書き終えたら、Gradle 未実行を理由に BLOCKED にせず `DONE` で report を書くこと。
+スキーマ JSON（`app/schemas/...`）は手で作らない（ビルド時に生成される）。
+
 ---
 
 ### Task 1: synced_playlist テーブルと DAO を追加し DB を 22 に上げる
