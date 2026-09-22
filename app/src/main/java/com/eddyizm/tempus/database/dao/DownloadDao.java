@@ -18,6 +18,9 @@ public interface DownloadDao {
     @Query("SELECT * FROM download WHERE download_state = 1 ORDER BY artist, album, disc_number, track ASC")
     List<Download> getAllSync();
 
+    @Query("SELECT * FROM download WHERE download_state = 1 AND playlist_id IS NOT NULL AND playlist_id != '' AND download_uri LIKE 'content://%'")
+    List<Download> getDirectoryPlaylistDownloadsSync();
+
     @Query("SELECT * FROM download WHERE id = :id")
     Download getOne(String id);
 

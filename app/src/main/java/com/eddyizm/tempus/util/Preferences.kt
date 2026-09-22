@@ -73,6 +73,7 @@ object Preferences {
     private const val DOWNLOAD_STORAGE = "download_storage"
     private const val DOWNLOAD_DIRECTORY_URI = "download_directory_uri"
     private const val DOWNLOAD_DIRECTORY_PRESERVE_PATH = "download_directory_preserve_path"
+    private const val PLAYLIST_SYNC_BACKFILLED = "playlist_sync_backfilled"
     private const val DEFAULT_DOWNLOAD_VIEW_TYPE = "default_download_view_type"
     private const val AUDIO_TRANSCODE_DOWNLOAD = "audio_transcode_download"
     private const val AUDIO_TRANSCODE_DOWNLOAD_PRIORITY = "audio_transcode_download_priority"
@@ -730,6 +731,16 @@ object Preferences {
     @JvmStatic
     fun isDownloadDirectoryPreservePath(): Boolean {
         return App.getInstance().preferences.getBoolean(DOWNLOAD_DIRECTORY_PRESERVE_PATH, false)
+    }
+
+    @JvmStatic
+    fun isPlaylistSyncBackfilled(): Boolean {
+        return App.getInstance().preferences.getBoolean(PLAYLIST_SYNC_BACKFILLED, false)
+    }
+
+    @JvmStatic
+    fun setPlaylistSyncBackfilled(value: Boolean) {
+        App.getInstance().preferences.edit().putBoolean(PLAYLIST_SYNC_BACKFILLED, value).apply()
     }
 
     @JvmStatic

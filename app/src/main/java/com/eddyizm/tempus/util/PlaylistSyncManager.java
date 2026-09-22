@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi;
 import com.eddyizm.tempus.App;
 import com.eddyizm.tempus.database.AppDatabase;
 import com.eddyizm.tempus.database.dao.SyncedPlaylistDao;
+import com.eddyizm.tempus.model.Download;
 import com.eddyizm.tempus.model.SyncedPlaylist;
 import com.eddyizm.tempus.service.DownloadProgressState;
 import com.eddyizm.tempus.subsonic.base.ApiResponse;
@@ -18,7 +19,9 @@ import com.eddyizm.tempus.subsonic.models.Child;
 import com.eddyizm.tempus.subsonic.models.PlaylistWithSongs;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -75,6 +78,7 @@ public final class PlaylistSyncManager {
         lastRunElapsedMs = now;
         executor.execute(() -> {
             try {
+                backfillOnce();
                 for (SyncedPlaylist row : dao.getAllSync()) {
                     syncOne(appContext, row);
                 }
@@ -99,6 +103,26 @@ public final class PlaylistSyncManager {
                 running.set(false);
             }
         });
+    }
+
+    private void backfillOnce() {
+        try {
+            if (Preferences.isPlaylistSyncBackfilled()) return;
+            LinkedHashMap<String, String> playlists = new LinkedHashMap<>();
+            for (Download download : AppDatabase.getInstance().downloadDao()
+                    .getDirectoryPlaylistDownloadsSync()) {
+                playlists.putIfAbsent(download.getPlaylistId(), download.getPlaylistName());
+            }
+            List<SyncedPlaylist> rows = new ArrayList<>();
+            for (Map.Entry<String, String> playlist : playlists.entrySet()) {
+                rows.add(new SyncedPlaylist(playlist.getKey(), playlist.getValue(), null, 0L));
+            }
+            dao.insertIfAbsent(rows);
+            Preferences.setPlaylistSyncBackfilled(true);
+            Log.i(TAG, "Backfilled directory playlists: " + rows.size());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to backfill directory playlists", e);
+        }
     }
 
     private static boolean canSync() {

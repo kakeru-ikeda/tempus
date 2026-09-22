@@ -24,6 +24,9 @@ public interface SyncedPlaylistDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void upsert(SyncedPlaylist syncedPlaylist);
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    void insertIfAbsent(List<SyncedPlaylist> rows);
+
     @Query("UPDATE synced_playlist SET name = :name, song_ids_hash = :songIdsHash, last_synced_at = :lastSyncedAt WHERE playlist_id = :playlistId")
     void updateSyncState(String playlistId, String name, String songIdsHash, long lastSyncedAt);
 
